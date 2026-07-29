@@ -10,26 +10,13 @@
 - 支持人员 + 日期编码
 - 支持短码反向解码
 - 使用 64 进制字符集，编码长度更短
-- 提供 Python 参考实现，便于二次开发或批量处理
 
 ## 快速开始
-
-### 方式一：直接使用网页工具
 
 1. 打开 `index.html`
 2. 在左侧选择人员
 3. 在中间选择日期并生成编码
 4. 在右侧输入或粘贴编码，可自动解码
-
-### 方式二：运行 Python 参考实现
-
-确保本机已安装 Python 3，然后执行：
-
-```bash
-python encoder.py
-```
-
-脚本会输出几组编码/解码示例，并执行全量校验。
 
 ## 编码规则
 
@@ -61,7 +48,6 @@ python encoder.py
 ```text
 .
 ├─ index.html       # 前端单文件工具
-├─ encoder.py       # Python 参考实现
 ├─ 人员名单.xlsx     # 员工数据来源
 └─ SKILL.md         # 项目说明/技能描述
 ```
@@ -81,22 +67,12 @@ python encoder.py
 当前人员列表写在：
 
 - `index.html` 中的 `EMPLOYEES` 数组
-- `encoder.py` 中的 `employees` 数组
 
-请保持两处顺序一致，因为编码依赖人员索引。
+请保持数组顺序稳定，因为编码依赖人员索引。
 
 ### 从 Excel 更新名单
 
-`人员名单.xlsx` 为原始数据源，可使用下面的代码提取姓名：
-
-```python
-import openpyxl
-
-wb = openpyxl.load_workbook("人员名单.xlsx")
-ws = wb["sheet1"]
-names = [row[1] for row in ws.iter_rows(min_row=2, values_only=True) if row[1]]
-print(", ".join(f'"{n}"' for n in names))
-```
+`人员名单.xlsx` 为原始数据源。更新时可直接从 Excel 中复制姓名列表，再同步替换 `index.html` 里的 `EMPLOYEES` 数组内容。
 
 ## 设计说明
 

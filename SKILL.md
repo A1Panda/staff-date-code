@@ -11,7 +11,6 @@ license: MIT
 将员工 + 月日压缩为最短字符编码（3字符），双向转换。
 
 入口：`index.html`（纯前端单文件，双击浏览器打开）
-参考实现：`encoder.py`（独立可运行的 Python 版本）
 数据源：`人员名单.xlsx`（员工姓名）
 
 ## 编码规则
@@ -34,39 +33,6 @@ license: MIT
 | #01 韩东昊 | 7月29日 | `3M` | 索引0，月日值209 |
 | #29 高晨翔 | 7月29日 | `2gO` | 索引28，月日值209 |
 | #37 谷美灵 | 12月31日 | `3N3` | 索引36，月日值371 |
-
-### 编码/解码实现
-
-```python
-ALPHABET = "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz-_"
-BASE = 64
-
-def to_b64(n: int) -> str:
-    if n == 0: return ALPHABET[0]
-    chars = []
-    while n > 0:
-        chars.append(ALPHABET[n % BASE])
-        n //= BASE
-    return "".join(reversed(chars))
-
-def from_b64(s: str) -> int:
-    n = 0
-    for ch in s:
-        n = n * BASE + ALPHABET.index(ch)
-    return n
-
-def encode(emp_idx: int, month: int, day: int) -> str:
-    md = (month - 1) * 31 + (day - 1)
-    return to_b64(emp_idx * 372 + md)
-
-def decode(code: str) -> tuple[int, int, int]:
-    n = from_b64(code)
-    emp_idx = n // 372
-    md = n % 372
-    month = md // 31 + 1
-    day = md % 31 + 1
-    return emp_idx, month, day
-```
 
 ## 员工名单
 
@@ -94,18 +60,10 @@ def decode(code: str) -> tuple[int, int, int]:
 ## 维护
 
 ### 增减人员
-编辑 `index.html` 中的 `EMPLOYEES` 数组，保持顺序（编码依赖索引）。同时更新 `encoder.py` 中同名数组。
+编辑 `index.html` 中的 `EMPLOYEES` 数组，保持顺序（编码依赖索引）。
 
 ### 从 Excel 重新生成
-`人员名单.xlsx`（Sheet: sheet1，列：序号、姓名）是数据源，可用以下 Python 代码提取并更新 HTML 中的数组：
-
-```python
-import openpyxl
-wb = openpyxl.load_workbook('人员名单.xlsx')
-ws = wb['sheet1']
-names = [row[1] for row in ws.iter_rows(min_row=2, values_only=True) if row[1]]
-print(', '.join(f'"{n}"' for n in names))
-```
+`人员名单.xlsx`（Sheet: sheet1，列：序号、姓名）是数据源，可直接从 Excel 复制姓名并更新 HTML 中的数组。
 
 ### 字符集变更
 修改 `ALPHABET` 字符串即可，需保证 64 个唯一字符。注意 `-` 和 `_` 需放在末尾避免正则转义问题。
