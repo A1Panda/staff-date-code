@@ -70,24 +70,12 @@
     <div class="manager-header">
       <div>
         <div class="manager-title">人员管理</div>
-        <div class="muted-note">支持新增、停用、启用、导入和导出。页面修改会直接写回服务器。</div>
+        <div class="muted-note">直接在槽位中编辑姓名，修改会自动写回服务器。</div>
       </div>
       <button class="btn btn-ghost" type="button" onclick="closeManager()">关闭</button>
     </div>
     <div class="manager-body">
       <div>
-        <div class="manager-card" style="margin-bottom:12px">
-          <h3>新增人员</h3>
-          <div class="field-row" style="margin-bottom:10px">
-            <label>姓名</label>
-            <input id="manageNameInput" type="text" placeholder="输入新员工姓名">
-          </div>
-          <div class="manager-actions">
-            <button class="btn btn-primary" type="button" onclick="addEmployeeFromUI()">新增</button>
-          </div>
-          <div class="muted-note">新员工会自动追加到末尾，分配新的固定序号。</div>
-        </div>
-
         <div class="manager-card" style="margin-bottom:12px">
           <h3>文件操作</h3>
           <div class="manager-export-actions">
@@ -95,7 +83,8 @@
           </div>
           <div class="manager-export-actions">
             <button class="btn btn-ghost" type="button" onclick="triggerImport()">导入 JSON 到服务器</button>
-            <button class="btn btn-ghost" type="button" onclick="exportEmployeesJson()">导出 employees.json</button>
+            <button class="btn btn-ghost" type="button" onclick="exportEmployeesJson()">导出 JSON</button>
+            <button class="btn btn-ghost" type="button" onclick="exportCodeMapping()">导出编码对照表</button>
           </div>
           <div class="manager-actions">
             <button class="btn btn-ghost" type="button" onclick="reloadEmployeesFromServer()">恢复服务器当前内容</button>

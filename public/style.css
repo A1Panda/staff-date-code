@@ -494,12 +494,58 @@ body.modal-open { overflow: hidden; }
 
 .manager-row {
   display: grid;
-  grid-template-columns: 56px 1fr 84px 70px;
-  gap: 8px;
+  grid-template-columns: 44px 52px 1fr 80px 72px;
+  gap: 6px;
   align-items: center;
   padding: 8px 10px;
   border-bottom: 1px solid #eee;
   font-size: 12px;
+}
+
+.slot-char {
+  font-family: 'Consolas', 'Cascadia Code', monospace;
+  font-weight: 700;
+  font-size: 14px;
+  color: var(--accent);
+  text-align: center;
+}
+
+.slot-name-input {
+  width: 100%;
+  padding: 4px 6px;
+  border: 1px solid transparent;
+  font-size: 12px;
+  outline: none;
+  background: transparent;
+  border-radius: 3px;
+  font-family: inherit;
+}
+
+.slot-name-input:hover { border-color: var(--border); }
+.slot-name-input:focus {
+  border-color: var(--accent);
+  background: #fff;
+}
+
+.manager-row.empty-slot {
+  background: #fafbfc;
+  color: #999;
+}
+
+.manager-row.empty-slot .slot-char {
+  color: #aab;
+}
+
+.manager-row.empty-slot .slot-name-input {
+  color: #999;
+}
+
+.manager-row.empty-slot .slot-name-input:focus {
+  color: var(--text);
+}
+
+.manager-row.empty-slot:hover {
+  background: #eef2f7;
 }
 
 .manager-row:hover { background: var(--row-hover); }
@@ -756,7 +802,8 @@ body.modal-open { overflow: hidden; }
   }
 
   .manager-body {
-    padding: 12px 14px 16px;
+    grid-template-columns: 1fr;
+    padding: 10px 12px 16px;
     gap: 12px;
   }
 
@@ -805,23 +852,34 @@ body.modal-open { overflow: hidden; }
   .manager-list { max-height: min(44dvh, 420px); }
 
   .manager-row {
-    grid-template-columns: 52px 1fr;
+    grid-template-columns: 44px 52px 1fr;
     grid-template-areas:
-      "index name"
-      "status action";
-    gap: 8px 12px;
+      "char index name"
+      "char status action";
+    gap: 6px 10px;
     padding: 12px;
     align-items: center;
   }
 
-  .manager-row > div:nth-child(1) { grid-area: index; }
-  .manager-row > div:nth-child(2) { grid-area: name; }
-  .manager-row > div:nth-child(3) { grid-area: status; }
-  .manager-row > div:nth-child(4) { grid-area: action; }
+  .manager-row > div:nth-child(1) { grid-area: char; }
+  .manager-row > div:nth-child(2) { grid-area: index; }
+  .manager-row > div:nth-child(3) { grid-area: name; }
+  .manager-row > div:nth-child(4) { grid-area: status; }
+  .manager-row > div:nth-child(5) { grid-area: action; }
 
   .manager-row .btn-ghost {
     width: 100%;
     min-height: 40px;
+  }
+
+  .slot-name-input {
+    font-size: 15px;
+    min-height: 40px;
+    padding: 8px 10px;
+  }
+
+  .slot-char {
+    font-size: 16px;
   }
 
   .manager-footer {

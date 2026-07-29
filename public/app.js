@@ -219,32 +219,59 @@ function updateFileConnectionNote() {
 }
 
 function renderManagerList() {
-  const employees = getEmployees();
-  const filter = document.getElementById('manageSearch').value.trim().toLowerCase();
-  const list = manageActiveOnly ? employees.filter((employee) => employee.active) : employees;
-  const filtered = list.filter((employee) => {
-    const indexText = String(employee.codeIndex + 1);
-    return !filter || employee.name.toLowerCase().includes(filter) || indexText.includes(filter);
-  });
+  var employees = getEmployees();
+  var empMap = new Map();
+  employees.forEach(function(e) { empMap.set(e.codeIndex, e); });
+
+  var filter = document.getElementById('manageSearch').value.trim().toLowerCase();
+  var slots = [];
+  for (var i = 0; i < 56; i++) {
+    var emp = empMap.get(i);
+    if (emp) {
+      if (manageActiveOnly && !emp.active) continue;
+      if (filter && !emp.name.toLowerCase().includes(filter) && !String(i+1).includes(filter)) continue;
+      slots.push({ codeIndex: i, name: emp.name, active: emp.active, firstChar: ALPHABET[i], empty: false });
+    } else {
+      if (manageActiveOnly) continue;
+      if (filter && !String(i+1).includes(filter)) continue;
+      slots.push({ codeIndex: i, name: '', active: true, firstChar: ALPHABET[i], empty: true });
+    }
+  }
 
   document.getElementById('manageFilterBtn').textContent = manageActiveOnly ? '显示全部' : '仅看启用';
-  if (filtered.length === 0) {
-    document.getElementById('managerList').innerHTML = '<div class="manager-empty">没有匹配的人员</div>';
+  if (slots.length === 0) {
+    document.getElementById('managerList').innerHTML = '<div class="manager-empty">没有匹配的槽位</div>';
     return;
   }
 
-  document.getElementById('managerList').innerHTML = filtered.map((employee) => `
-    <div class="manager-row ${employee.active ? '' : 'inactive'}">
-      <div>${String(employee.codeIndex + 1).padStart(2,'0')}</div>
-      <div class="manager-row-name">${employee.name}</div>
-      <div><span class="badge ${employee.active ? 'ok' : 'off'}">${employee.active ? '启用' : '停用'}</span></div>
-      <div>
-        <button class="btn btn-ghost" type="button" onclick="toggleEmployeeActive(${employee.codeIndex})">
-          ${employee.active ? '停用' : '启用'}
-        </button>
-      </div>
-    </div>
-  `).join('');
+  document.getElementById('managerList').innerHTML = slots.map(function(s) {
+    var rowClass = s.empty ? 'manager-row empty-slot' : ('manager-row ' + (s.active ? '' : 'inactive'));
+    var badge = s.empty
+      ? '<span class="badge off">空位</span>'
+      : ('<span class="badge ' + (s.active ? 'ok' : 'off') + '">' + (s.active ? '启用' : '停用') + '</span>');
+    var actionBtn = s.empty ? '' :
+      '<button class="btn btn-ghost" type="button" onclick="toggleEmployeeActive(' + s.codeIndex + ')">' +
+      (s.active ? '停用' : '启用') + '</button>';
+    return '<div class="' + rowClass + '">' +
+      '<div class="slot-char">' + s.firstChar + '</div>' +
+      '<div>' + String(s.codeIndex + 1).padStart(2,'0') + '</div>' +
+      '<div><input class="slot-name-input" type="text" value="' + s.name + '" data-slot="' + s.codeIndex + '" placeholder="输入姓名"></div>' +
+      '<div>' + badge + '</div>' +
+      '<div>' + actionBtn + '</div>' +
+    '</div>';
+  }).join('');
+
+  // 绑定输入框失焦保存
+  document.querySelectorAll('.slot-name-input').forEach(function(input) {
+    input.addEventListener('blur', function() {
+      var slotIdx = parseInt(this.dataset.slot, 10);
+      var newName = this.value.trim();
+      saveSlotEmployee(slotIdx, newName, this);
+    });
+    input.addEventListener('keydown', function(e) {
+      if (e.key === 'Enter') { this.blur(); }
+    });
+  });
 }
 
 function renderUI() {
@@ -449,43 +476,69 @@ async function writeCurrentStoreToServer(successMessage) {
   }
 }
 
-async function addEmployeeFromUI() {
-  const input = document.getElementById('manageNameInput');
-  const name = input.value.trim();
-  if (!name) {
-    setManagerStatus('请输入要新增的姓名。', 'err');
+async function saveSlotEmployee(codeIndex, newName, inputEl) {
+  var previousStore = cloneStore(employeeStore);
+  var emp = getEmployeeByCodeIndex(codeIndex);
+
+  if (!newName) {
+    // 清空槽位 — 直接移除人员
+    if (emp) {
+      var idx = employeeStore.employees.findIndex(function(e) { return e.codeIndex === codeIndex; });
+      if (idx !== -1) {
+        employeeStore.employees.splice(idx, 1);
+        await writeCurrentStoreToServer('已清除槽位 ' + ALPHABET[codeIndex] + '（原: ' + emp.name + '）');
+      }
+    }
     return;
   }
-  if (getEmployees().some((employee) => employee.name === name)) {
-    setManagerStatus(`人员已存在：${name}`, 'err');
-    return;
+
+  if (emp) {
+    // 更新姓名或重新启用
+    if (emp.name === newName && emp.active) return; // 没变化
+    emp.name = newName;
+    emp.active = true;
+    await writeCurrentStoreToServer('已更新槽位 ' + ALPHABET[codeIndex] + ' 为 ' + newName);
+  } else {
+    // 新槽位新增
+    if (codeIndex > 55) {
+      setManagerStatus('槽位序号不能超过 55。', 'err');
+      employeeStore = previousStore;
+      renderAll();
+      return;
+    }
+    if (getEmployees().some(function(e) { return e.name === newName; })) {
+      setManagerStatus('人员已存在：' + newName, 'err');
+      employeeStore = previousStore;
+      renderAll();
+      return;
+    }
+    employeeStore.employees.push({ codeIndex: codeIndex, name: newName, active: true });
+    await writeCurrentStoreToServer('已新增 ' + newName + '（首位: ' + ALPHABET[codeIndex] + '）');
   }
-  const employees = getEmployees();
-  const nextCodeIndex = employees.length === 0 ? 0 : employees[employees.length - 1].codeIndex + 1;
-  if (nextCodeIndex > 55) {
-    setManagerStatus('已达到最大人员数（56），编码第1位只能表示 0-55。', 'err');
-    return;
+
+  if (inputEl) {
+    // 刷新后保持焦点
+    setTimeout(function() {
+      renderManagerList();
+      renderManagerSummary();
+      updateRulesSummary();
+      renderEncodeEmployeeOptions();
+      renderEmpTable(document.getElementById('empSearch').value);
+      ensureSelectedEmployee();
+      doEncode();
+    }, 100);
   }
-  const previousStore = cloneStore(employeeStore);
-  employeeStore.employees.push({ codeIndex: nextCodeIndex, name, active: true });
-  const success = await writeCurrentStoreToServer(`已新增 ${name}，并写入服务器。`);
-  if (success) {
-    input.value = '';
-    return;
-  }
-  employeeStore = previousStore;
-  renderAll();
 }
 
 async function toggleEmployeeActive(codeIndex) {
-  const employee = employeeStore.employees.find((item) => item.codeIndex === codeIndex);
+  var employee = employeeStore.employees.find(function(e) { return e.codeIndex === codeIndex; });
   if (!employee) return;
-  const previousStore = cloneStore(employeeStore);
+  var previous = cloneStore(employeeStore);
   employee.active = !employee.active;
-  const actionLabel = employee.active ? '启用' : '停用';
-  const success = await writeCurrentStoreToServer(`${employee.name} 已${actionLabel}，并写入服务器。`);
+  var label = employee.active ? '启用' : '停用';
+  var success = await writeCurrentStoreToServer(employee.name + ' 已' + label);
   if (success) return;
-  employeeStore = previousStore;
+  employeeStore = previous;
   renderAll();
 }
 
@@ -510,7 +563,28 @@ function toEmployeesJsonText() {
 
 function exportEmployeesJson() {
   downloadTextFile('employees.json', toEmployeesJsonText());
-  setManagerStatus('已导出 employees.json。');
+  setManagerStatus('已导出 JSON。');
+}
+
+function exportCodeMapping() {
+  var employees = getEmployees();
+  var empMap = new Map();
+  employees.forEach(function(e) { empMap.set(e.codeIndex, e); });
+
+  var rows = [['首位','序号','姓名','状态']];
+  for (var i = 0; i < 56; i++) {
+    var emp = empMap.get(i);
+    rows.push([
+      ALPHABET[i],
+      String(i + 1),
+      emp ? emp.name : '—',
+      emp ? (emp.active ? '启用' : '停用') : '空位'
+    ]);
+  }
+
+  var csv = '\uFEFF' + rows.map(function(r) { return r.join(','); }).join('\r\n');
+  downloadTextFile('编码对照表.csv', csv);
+  setManagerStatus('已导出编码对照表（56个槽位）。');
 }
 
 function applyImportedStore(rawStore) {
@@ -586,10 +660,6 @@ function bindEvents() {
 
   document.getElementById('manageSearch').addEventListener('input', function() {
     renderManagerList();
-  });
-
-  document.getElementById('manageNameInput').addEventListener('keydown', function(event) {
-    if (event.key === 'Enter') addEmployeeFromUI();
   });
 
   document.addEventListener('keydown', function(event) {
