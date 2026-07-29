@@ -1,0 +1,15 @@
+{
+  "name": "personnel-date-encoder",
+  "version": "1.0.0",
+  "description": "Node.js CLI for encoding and decoding employee + date values.",
+  "license": "MIT",
+  "bin": {
+    "personnel-date-encoder": "./scripts/cli.js"
+  },
+  "scripts": {
+    "start": "node ./scripts/server.js",
+    "encode:demo": "node ./scripts/cli.js encode --employee 高晨翔 --month 7 --day 29 --pretty",
+    "decode:demo": "node ./scripts/cli.js decode --code 2c6 --pretty",
+    "employee:list": "node ./scripts/cli.js employee list --pretty"
+  }
+}
