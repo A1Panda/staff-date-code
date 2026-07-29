@@ -112,6 +112,21 @@ function serveStaticFile(response, urlPathname) {
 
 const server = http.createServer(async (request, response) => {
   const requestUrl = new URL(request.url, `http://${request.headers.host || "localhost"}`);
+  const ts = new Date().toISOString();
+  console.log(`[${ts}] ${request.method} ${requestUrl.pathname}`);
+
+  if (requestUrl.pathname === "/api/date") {
+    response.setHeader("Cache-Control", "no-store");
+    if (request.method === "GET") {
+      const now = new Date();
+      const payload = { month: now.getMonth() + 1, day: now.getDate() };
+      console.log(`[api/date] ${now.toISOString()} -> ${JSON.stringify(payload)}`);
+      sendJson(response, 200, payload);
+      return;
+    }
+    sendJson(response, 405, { error: "Method Not Allowed" });
+    return;
+  }
 
   if (requestUrl.pathname === "/api/employees") {
     response.setHeader("Cache-Control", "no-store");
