@@ -10,9 +10,7 @@ function toBase64(n) {
   while (n > 0n) { chars.push(ALPHABET[Number(n % BASE)]); n /= BASE; }
   return chars.reverse().join('');
 }
-function padBase64(n, length) {
-  return toBase64(BigInt(n)).padStart(length, ALPHABET[0]);
-}
+
 function fromBase64(s) {
   let n = 0n;
   for (const ch of s) {
@@ -22,14 +20,12 @@ function fromBase64(s) {
   }
   return n;
 }
-function md2int(m, d) { return (m - 1) * 31 + (d - 1); }
-function int2md(v) { return [Math.floor(v / 31) + 1, (v % 31) + 1]; }
-// 第1位=人员，第2-3位=日期，固定3位
-function encode(ei, m, d) { return toBase64(BigInt(ei)) + padBase64(md2int(m, d), 2); }
+// 第1位=人员，第2位=月，第3位=日，固定3位
+function encode(ei, m, d) { return toBase64(BigInt(ei)) + toBase64(BigInt(m - 1)) + toBase64(BigInt(d - 1)); }
 function decode(code) {
   const ei = Number(fromBase64(code[0]));
-  const md = Number(fromBase64(code.slice(1)));
-  const [m, d] = int2md(md);
+  const m = Number(fromBase64(code[1])) + 1;
+  const d = Number(fromBase64(code[2])) + 1;
   return [ei, m, d];
 }
 

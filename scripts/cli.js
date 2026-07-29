@@ -246,17 +246,6 @@ function resolveEmployeeForMutation(store, args) {
   throw createCliError("MISSING_ARGUMENT", "需要 --employee 或 --index");
 }
 
-function monthDayToInt(month, day) {
-  return (month - 1) * 31 + (day - 1);
-}
-
-function intToMonthDay(value) {
-  return {
-    month: Math.floor(value / 31) + 1,
-    day: (value % 31) + 1
-  };
-}
-
 function toBase64(value) {
   if (value === 0n) {
     return ALPHABET[0];
@@ -271,10 +260,6 @@ function toBase64(value) {
   return chars.reverse().join("");
 }
 
-function padBase64(n, length) {
-  return toBase64(BigInt(n)).padStart(length, ALPHABET[0]);
-}
-
 function fromBase64(text) {
   let value = 0n;
   for (const ch of text) {
@@ -287,15 +272,16 @@ function fromBase64(text) {
   return value;
 }
 
+// 第1位=人员，第2位=月，第3位=日，固定3位
 function encode(codeIndex, month, day) {
-  return toBase64(BigInt(codeIndex)) + padBase64(monthDayToInt(month, day), 2);
+  return toBase64(BigInt(codeIndex)) + toBase64(BigInt(month - 1)) + toBase64(BigInt(day - 1));
 }
 
 function decode(code) {
   const ei = Number(fromBase64(code[0]));
-  const md = Number(fromBase64(code.slice(1)));
-  const { month, day } = intToMonthDay(md);
-  return { codeIndex: ei, month, day };
+  const m = Number(fromBase64(code[1])) + 1;
+  const d = Number(fromBase64(code[2])) + 1;
+  return { codeIndex: ei, month: m, day: d };
 }
 
 function serializeStore(store) {
