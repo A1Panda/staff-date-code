@@ -5,9 +5,10 @@
 const fs = require("node:fs");
 const path = require("node:path");
 
-const ALPHABET = "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz-_";
-const BASE = 64n;
-const DATE_SLOT_COUNT = 372;
+// 不含易混淆字符: 0 O o 1 I l，不含特殊符号 _ -（共56个字符）
+const ALPHABET = "23456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnpqrstuvwxyz";
+const BASE = 56n;
+const MAX_EMPLOYEE = 55; // 第1位编码最多支持 56 人（0-55）
 const DEFAULT_DATA_FILE = path.join(__dirname, "..", "data", "employees.json");
 
 function printHelp() {
@@ -270,6 +271,10 @@ function toBase64(value) {
   return chars.reverse().join("");
 }
 
+function padBase64(n, length) {
+  return toBase64(BigInt(n)).padStart(length, ALPHABET[0]);
+}
+
 function fromBase64(text) {
   let value = 0n;
   for (const ch of text) {
@@ -283,15 +288,14 @@ function fromBase64(text) {
 }
 
 function encode(codeIndex, month, day) {
-  return toBase64(BigInt(codeIndex) * 372n + BigInt(monthDayToInt(month, day)));
+  return toBase64(BigInt(codeIndex)) + padBase64(monthDayToInt(month, day), 2);
 }
 
 function decode(code) {
-  const value = fromBase64(code);
-  const codeIndex = Number(value / 372n);
-  const dateValue = Number(value % 372n);
-  const { month, day } = intToMonthDay(dateValue);
-  return { codeIndex, month, day };
+  const ei = Number(fromBase64(code[0]));
+  const md = Number(fromBase64(code.slice(1)));
+  const { month, day } = intToMonthDay(md);
+  return { codeIndex: ei, month, day };
 }
 
 function serializeStore(store) {
@@ -334,9 +338,7 @@ function handleEncode(args) {
     displayIndex: employee.codeIndex + 1,
     active: employee.active,
     month,
-    day,
-    slot: monthDayToInt(month, day),
-    maxEmployeeCountFor3Chars: Math.floor((64 ** 3) / DATE_SLOT_COUNT)
+    day
   });
 }
 
@@ -363,8 +365,7 @@ function handleDecode(args) {
     displayIndex: employee.codeIndex + 1,
     active: employee.active,
     month: decoded.month,
-    day: decoded.day,
-    slot: monthDayToInt(decoded.month, decoded.day)
+    day: decoded.day
   });
 }
 
@@ -405,6 +406,13 @@ function handleEmployeeAdd(args) {
   const nextCodeIndex = store.employees.length === 0
     ? 0
     : Math.max(...store.employees.map((item) => item.codeIndex)) + 1;
+
+  if (nextCodeIndex > MAX_EMPLOYEE) {
+    throw createCliError(
+      "EMPLOYEE_LIMIT",
+      `已达到最大人员数（${MAX_EMPLOYEE + 1}），编码第1位只能表示0-${MAX_EMPLOYEE}`
+    );
+  }
 
   const employee = { codeIndex: nextCodeIndex, name, active: true };
   store.employees.push(employee);

@@ -1,5 +1,6 @@
-const ALPHABET = "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz-_";
-const BASE = 64n;
+// 不含易混淆字符: 0 O o 1 I l，不含特殊符号 _ -（共56个字符）
+const ALPHABET = "23456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnpqrstuvwxyz";
+const BASE = 56n;
 const EMPLOYEE_API_PATH = "/api/employees";
 const CHAR_REGEX = new RegExp('^[' + ALPHABET.replace(/[-_\\]/g,'\\$&') + ']+$');
 
@@ -8,6 +9,9 @@ function toBase64(n) {
   let chars = [];
   while (n > 0n) { chars.push(ALPHABET[Number(n % BASE)]); n /= BASE; }
   return chars.reverse().join('');
+}
+function padBase64(n, length) {
+  return toBase64(BigInt(n)).padStart(length, ALPHABET[0]);
 }
 function fromBase64(s) {
   let n = 0n;
@@ -20,11 +24,12 @@ function fromBase64(s) {
 }
 function md2int(m, d) { return (m - 1) * 31 + (d - 1); }
 function int2md(v) { return [Math.floor(v / 31) + 1, (v % 31) + 1]; }
-function encode(ei, m, d) { return toBase64(BigInt(ei) * 372n + BigInt(md2int(m, d))); }
+// 第1位=人员，第2-3位=日期，固定3位
+function encode(ei, m, d) { return toBase64(BigInt(ei)) + padBase64(md2int(m, d), 2); }
 function decode(code) {
-  const n = fromBase64(code);
-  const ei = Number(n / 372n);
-  const [m, d] = int2md(Number(n % 372n));
+  const ei = Number(fromBase64(code[0]));
+  const md = Number(fromBase64(code.slice(1)));
+  const [m, d] = int2md(md);
   return [ei, m, d];
 }
 
@@ -91,10 +96,7 @@ function getEmployeeByCodeIndex(codeIndex) {
 }
 
 function getMaxCodeLength() {
-  const employees = getEmployees();
-  if (employees.length === 0) return 0;
-  const lastEmployee = employees[employees.length - 1];
-  return encode(lastEmployee.codeIndex, 12, 31).length;
+  return 3; // 固定3位：1位人员 + 2位日期
 }
 
 function renderEmpTable(filter = '') {
@@ -382,6 +384,7 @@ function handleDecodeInput() {
   const code = this.value.trim();
   const r = document.getElementById('decodeResult');
   if (!code) { r.textContent = '输入编码后自动解码'; r.className = 'decode-result wait'; return; }
+  if (code.length !== 3) { r.textContent = '编码固定为3位（第1位人员，后2位日期）'; r.className = 'decode-result err'; return; }
   if (!CHAR_REGEX.test(code)) {
     r.textContent = '包含非法字符'; r.className = 'decode-result err'; return;
   }
@@ -459,6 +462,10 @@ async function addEmployeeFromUI() {
   }
   const employees = getEmployees();
   const nextCodeIndex = employees.length === 0 ? 0 : employees[employees.length - 1].codeIndex + 1;
+  if (nextCodeIndex > 55) {
+    setManagerStatus('已达到最大人员数（56），编码第1位只能表示 0-55。', 'err');
+    return;
+  }
   const previousStore = cloneStore(employeeStore);
   employeeStore.employees.push({ codeIndex: nextCodeIndex, name, active: true });
   const success = await writeCurrentStoreToServer(`已新增 ${name}，并写入服务器。`);
