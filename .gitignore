@@ -1,0 +1,8 @@
+# 人员数据文件：不上传 GitHub
+# 人员名单与编码在生产环境本地维护，上传会被远程版本覆盖，导致新增人员丢失
+data/employees.json
+data/人员名单.xlsx
+人员日期编码对照表.xlsx
+
+# Node
+node_modules/

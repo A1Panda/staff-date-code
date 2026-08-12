@@ -24,6 +24,28 @@ const MIME_TYPES = {
   ".ico": "image/x-icon"
 };
 
+// 与 scripts/cli.js、public/app.js 保持一致的 56 字符集编码（剔除易混淆字符）
+const ALPHABET = "23456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnpqrstuvwxyz";
+const BASE = 56n;
+
+function toBase64(value) {
+  if (value === 0n) {
+    return ALPHABET[0];
+  }
+  let remaining = value;
+  const chars = [];
+  while (remaining > 0n) {
+    chars.push(ALPHABET[Number(remaining % BASE)]);
+    remaining /= BASE;
+  }
+  return chars.reverse().join("");
+}
+
+// 第1位=人员，第2位=月，第3位=日，固定3位
+function encode(codeIndex, month, day) {
+  return toBase64(BigInt(codeIndex)) + toBase64(BigInt(month - 1)) + toBase64(BigInt(day - 1));
+}
+
 function sendJson(response, statusCode, payload) {
   response.writeHead(statusCode, { "Content-Type": "application/json; charset=utf-8" });
   response.end(JSON.stringify(payload, null, 2));
@@ -147,6 +169,54 @@ const server = http.createServer(async (request, response) => {
       sendJson(response, 400, { error: error.message || "请求失败" });
       return;
     }
+  }
+
+  if (requestUrl.pathname === "/api/daily") {
+    response.setHeader("Cache-Control", "no-store");
+    if (request.method !== "GET") {
+      sendJson(response, 405, { error: "Method Not Allowed" });
+      return;
+    }
+
+    try {
+      // 缺省使用服务器当天日期，也可通过 ?month=8&day=12 指定
+      const monthParam = requestUrl.searchParams.get("month");
+      const dayParam = requestUrl.searchParams.get("day");
+      let month;
+      let day;
+      if (monthParam === null && dayParam === null) {
+        const now = new Date();
+        month = now.getMonth() + 1;
+        day = now.getDate();
+      } else {
+        month = Number(monthParam);
+        day = Number(dayParam);
+        if (!Number.isInteger(month) || month < 1 || month > 12 || !Number.isInteger(day) || day < 1 || day > 31) {
+          sendJson(response, 400, { error: "month 必须在 1-12，day 必须在 1-31" });
+          return;
+        }
+      }
+
+      const store = readEmployeesStore();
+      const employees = store.employees
+        .filter((item) => item.active)
+        .sort((a, b) => a.codeIndex - b.codeIndex)
+        .map((item) => ({
+          codeIndex: item.codeIndex,
+          index: item.codeIndex + 1,
+          name: item.name,
+          code: encode(item.codeIndex, month, day)
+        }));
+
+      sendJson(response, 200, {
+        date: { month, day },
+        total: employees.length,
+        employees
+      });
+    } catch (error) {
+      sendJson(response, 500, { error: error.message || "服务器错误" });
+    }
+    return;
   }
 
   if (request.method !== "GET" && request.method !== "HEAD") {

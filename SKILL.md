@@ -1,6 +1,6 @@
 ---
 name: personnel-date-encoder
-description: Use when encoding/decoding employee+date into shortest possible character codes (3-char base64), or when maintaining the personnel-date encoding web tool.
+description: Use when encoding/decoding employee+date into fixed 3-char codes (person+month+day, 56-char set), or when maintaining the personnel-date encoding web tool.
 version: 1.0.0
 author: 高晨翔
 license: MIT
@@ -19,23 +19,23 @@ CLI：`scripts/cli.js`（Node.js 命令行工具，适合 OpenClaw 调用）
 ## 编码规则
 
 ```
-最终整数 = 员工索引(0~N-1) × 372 + (月-1)×31 + (日-1)
-编码字符串 = base64(最终整数)
+编码字符串 = toBase56(人员codeIndex) + toBase56(月-1) + toBase56(日-1)
 ```
 
-- 月日组合：12×31 = 372 种
-- 字符集：`0-9 A-Z a-z - _` 共 64 个字符
-- 37 人 → 编码 **3 字符**
-- ≤11 人 → 2 字符，≤704 人 → 3 字符，≤45000 人 → 4 字符
+- 第 1 位：人员序号（`codeIndex`，0-55）
+- 第 2 位：月份（0-11），第 3 位：日期（0-30）
+- 字符集：`23456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnpqrstuvwxyz` 共 56 个字符
+- 剔除易混淆字符 `0 O o 1 I l` 和 `- _`
+- 编码固定 **3 字符**，上限 56 人（当前 35 人）
 
 ### 示例
 
 | 员工 | 日期 | 编码 | 说明 |
 |------|------|------|------|
-| #01 韩东昊 | 1月1日 | `0` | 索引0，月日值0 |
-| #01 韩东昊 | 7月29日 | `3M` | 索引0，月日值214 |
-| #29 高晨翔 | 7月29日 | `2c6` | 索引28，月日值214 |
-| #37 谷美灵 | 12月31日 | `3N3` | 索引36，月日值371 |
+| #01 韩东昊 | 1月1日 | `222` | 首位0，月0，日0 |
+| #01 韩东昊 | 7月29日 | `28W` | 首位0，月6，日28 |
+| #29 高晨翔 | 7月29日 | `W8W` | 首位28，月6，日28 |
+| #35 姜振涛 | 12月31日 | `cDY` | 首位34，月11，日30 |
 
 ### ⚠️ 操作铁律（每次解码/编码必须执行）
 
@@ -45,14 +45,14 @@ CLI：`scripts/cli.js`（Node.js 命令行工具，适合 OpenClaw 调用）
 
 ## 员工名单
 
-37 人，来自 `人员名单.xlsx`（Sheet: sheet1，列：序号、姓名）：
+35 人，来自 `data/employees.json`（原始来源 `人员名单.xlsx`，Sheet: sheet1，列：序号、姓名）：
 
 ```
 韩东昊,代志刚,张晓飞,刘晓鹏,吕培高,王新飞,张波,赵天良,
 战为超,李忠俊,张春辉,徐俊强,赵华,刘益飞,常国辉,郭海洋,
 刘成双,李沛桢,唐言鹏,刘壮,张倡盛,姜兴志,任玉亭,张伟涛,
 李宁,刘恩骏,于英,李立娟,高晨翔,封景隆,杨鹏斐,李崇茂,
-杨宜林,刘博,姜振涛,周海燕,谷美灵
+杨宜林,刘博,姜振涛
 ```
 
 ## 前端功能
@@ -73,7 +73,7 @@ CLI：`scripts/cli.js`（Node.js 命令行工具，适合 OpenClaw 调用）
 
 - `node scripts/cli.js encode --employee 高晨翔 --month 7 --day 29`
 - `node scripts/cli.js encode --index 29 --month 7 --day 29`
-- `node scripts/cli.js decode --code 2c6`
+- `node scripts/cli.js decode --code W8W`
 - `node scripts/cli.js list`
 - `node scripts/cli.js employee add --name 新员工`
 - `node scripts/cli.js employee disable --index 29`
@@ -102,11 +102,11 @@ CLI：`scripts/cli.js`（Node.js 命令行工具，适合 OpenClaw 调用）
 3. 新人只追加到末尾
 
 ### 字符集变更
-修改 `ALPHABET` 字符串即可，需保证 64 个唯一字符。注意 `-` 和 `_` 需放在末尾避免正则转义问题。
+修改 `ALPHABET` 字符串即可，需保证 56 个唯一字符，不要包含易混淆字符 `0 O o 1 I l` 和 `- _`（避免抄录出错及正则转义问题）。`BASE` 常量需同步保持 56。
 
 ## 设计决策
 
 1. **不用拼音首字母**：拼音编码（如 HDH0729）6-7 字符；纯短码仅 3 字符
-2. **base64 而非 base36**：base36（36字符）37 人需 4 字符；base64（64字符）704 人以内只需 3 字符
+2. **56 进制而非 64 进制**：56 字符剔除易混淆字符后，第 1 位仍可表示 56 人（0-55），满足现有 35 人且编码固定 3 位；人数超过 56 才需扩容
 3. **去掉剪贴板读取**：`readText()` 触发浏览器权限弹窗，改用 Ctrl+V 原生粘贴
 4. **点击即复制**：编码和解码结果区点击直接复制（`writeText` 不弹权限）

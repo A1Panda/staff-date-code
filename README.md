@@ -2,7 +2,7 @@
 
 将“人员 + 月日”压缩为尽可能短的字符编码，并支持双向解码。
 
-这个项目适合用于需要快速记录“人员 + 日期”组合的场景，比如质检标记、流转记录、工序追溯等。当前员工名单为 37 人时，大部分结果可压缩为 `3` 个字符。
+这个项目适合用于需要快速记录“人员 + 日期”组合的场景，比如质检标记、流转记录、工序追溯等。当前员工名单为 35 人时，编码固定为 `3` 个字符。
 
 项目同时提供：
 
@@ -17,7 +17,7 @@
 - 提供 Node.js CLI，适合脚本化调用
 - 支持人员 + 日期编码
 - 支持短码反向解码
-- 使用 64 进制字符集，编码长度更短
+- 使用 56 进制字符集（剔除易混淆字符），编码固定 3 位
 
 ## 快速开始
 
@@ -53,7 +53,7 @@ http://127.0.0.1:3100
 
 ```bash
 node scripts/cli.js encode --employee 高晨翔 --month 7 --day 29
-node scripts/cli.js decode --code 2c6
+node scripts/cli.js decode --code W8W
 node scripts/cli.js list
 node scripts/cli.js employee add --name 新员工
 ```
@@ -82,15 +82,13 @@ node scripts/cli.js encode --employee 高晨翔 --month 7 --day 29 --pretty
   "success": true,
   "action": "encode",
   "data": {
-    "code": "2c6",
+    "code": "W8W",
     "employee": "高晨翔",
     "employeeIndex": 28,
     "displayIndex": 29,
     "active": true,
     "month": 7,
-    "day": 29,
-    "slot": 214,
-    "maxEmployeeCountFor3Chars": 704
+    "day": 29
   }
 }
 ```
@@ -98,7 +96,7 @@ node scripts/cli.js encode --employee 高晨翔 --month 7 --day 29 --pretty
 ### 解码
 
 ```bash
-node scripts/cli.js decode --code 2c6 --pretty
+node scripts/cli.js decode --code W8W --pretty
 ```
 
 示例返回：
@@ -108,14 +106,13 @@ node scripts/cli.js decode --code 2c6 --pretty
   "success": true,
   "action": "decode",
   "data": {
-    "code": "2c6",
+    "code": "W8W",
     "employee": "高晨翔",
     "employeeIndex": 28,
     "displayIndex": 29,
     "active": true,
     "month": 7,
-    "day": 29,
-    "slot": 214
+    "day": 29
   }
 }
 ```
@@ -125,7 +122,7 @@ node scripts/cli.js decode --code 2c6 --pretty
 如果只需要人类可读结果，可以加 `--text`：
 
 ```bash
-node scripts/cli.js decode --code 2c6 --text
+node scripts/cli.js decode --code W8W --text
 ```
 
 ## 名单维护方案
@@ -143,25 +140,28 @@ node scripts/cli.js decode --code 2c6 --text
 核心公式：
 
 ```text
-最终整数 = 员工索引 × 372 + 月日偏移
-月日偏移 = (月 - 1) × 31 + (日 - 1)
-编码字符串 = base64(最终整数)
+编码字符串 = toBase56(人员codeIndex) + toBase56(月-1) + toBase56(日-1)
 ```
+
+- 第 1 位：人员序号（`codeIndex`，从 0 开始）
+- 第 2 位：月份（0-11）
+- 第 3 位：日期（0-30）
+- 编码固定 `3` 个字符，不随人数变化
 
 说明：
 
-- 每人共有 `12 × 31 = 372` 种月日组合
-- 字符集为 `0-9 A-Z a-z - _`，共 64 个字符
-- 当前 37 人时，编码长度为 `3` 字符
+- 字符集为 `23456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnpqrstuvwxyz`，共 56 个字符
+- 刻意剔除易混淆字符 `0 O o 1 I l` 和特殊符号 `- _`
+- 第 1 位可表示 56 人（`codeIndex` 0-55），当前 35 人，编码长度为 `3` 字符
 
 ### 示例
 
 | 人员 | 日期 | 编码 |
 | --- | --- | --- |
-| 韩东昊 | 1月1日 | `0` |
-| 韩东昊 | 7月29日 | `3M` |
-| 高晨翔 | 7月29日 | `2c6` |
-| 谷美灵 | 12月31日 | `3N3` |
+| 韩东昊 | 1月1日 | `222` |
+| 韩东昊 | 7月29日 | `28W` |
+| 高晨翔 | 7月29日 | `W8W` |
+| 姜振涛 | 12月31日 | `cDY` |
 
 ## 项目结构
 
@@ -198,6 +198,44 @@ node scripts/cli.js decode --code 2c6 --text
 - 可导入本地 `employees.json`，并直接覆盖服务器当前数据
 - 可导出新的 `employees.json`
 - 新增 / 停用 / 启用人员后，会直接写入服务器文件
+
+## HTTP 接口
+
+服务由 `scripts/server.js` 提供，端口默认 `3100`。
+
+| 接口 | 方法 | 说明 |
+| --- | --- | --- |
+| `/api/employees` | GET | 读取人员名单 |
+| `/api/employees` | PUT | 覆盖写入人员名单 |
+| `/api/date` | GET | 获取服务器当天日期 `{month, day}` |
+| `/api/daily` | GET | 获取指定日期所有启用人员及编码 |
+
+### `/api/daily`
+
+获取某天所有启用人员及其 3 位编码，编码规则与 CLI / 前端完全一致。
+
+```bash
+# 指定日期
+curl "http://127.0.0.1:3100/api/daily?month=8&day=12"
+# 不传参数时默认服务器当天日期
+curl "http://127.0.0.1:3100/api/daily"
+```
+
+返回示例：
+
+```json
+{
+  "date": { "month": 8, "day": 12 },
+  "total": 35,
+  "employees": [
+    { "codeIndex": 0, "index": 1, "name": "韩东昊", "code": "29D" },
+    { "codeIndex": 1, "index": 2, "name": "代志刚", "code": "39D" }
+  ]
+}
+```
+
+- `month` 取值 1-12，`day` 取值 1-31，非法参数返回 `400`
+- 只包含启用人员（`active: true`），按 `codeIndex` 升序
 
 ## CLI 参数说明
 
@@ -259,12 +297,13 @@ node scripts/cli.js decode --code 2c6 --text
 ## 设计说明
 
 - 选择短码方案而不是拼音缩写，是为了尽可能减少字符长度
-- 使用 Base64 而不是 Base36，是为了在人员数量增加后仍保持较短编码
+- 采用 56 进制字符集（而非 64 进制），剔除易混淆字符 `0 O o 1 I l` 和 `- _`，避免人工抄录/口播时出错
+- 第 1 位单独表示人员、后 2 位表示月日，解码无需整体换算，人员增减（只追加不重排）也不会影响既有编码
 - 网页版去掉了主动读取剪贴板，减少浏览器权限提示
 
 ## 适用范围
 
-这个方案默认将日期空间按 `12 × 31` 处理，即允许每个月都映射到 31 天。  
+这个方案按「人员 1 位 + 月 1 位 + 日 1 位」编码，月份取值 1-12、日期取值 1-31，即允许每个月都映射到 31 天。  
 它适合做“编码压缩”和“快速记录”，但不会校验真实日历日期，例如 2 月 31 日在编码上仍然是可表示的。
 
 如果后续需要，也可以扩展为“只允许真实日期”的版本。
